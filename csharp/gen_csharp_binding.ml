@@ -1326,6 +1326,7 @@ and proxy_type = function
   | Enum _              -> "string"
   | Map _               -> "Object"
   | Record name         -> "Proxy_" ^ exposed_class_name name
+  | Option name         -> proxy_type name
 
 and exposed_type_opt = function
     Some (typ, _) -> exposed_type typ
@@ -1348,6 +1349,7 @@ and exposed_type = function
                                  (exposed_type v)
   | Record name             -> exposed_class_name name
   | Set(Record name)        -> sprintf "List<%s>" (exposed_class_name name)
+  | Option n                -> sprintf "System.Nullable<%s>" (exposed_type n)
   | _                       -> assert false
 
 
@@ -1413,6 +1415,7 @@ and convert_from_hashtable fname ty =
     sprintf "%s.ProxyArrayToObjectList(Marshalling.ParseStringArray(%s))"
       (exposed_class_name name) field
   | Set(Int)            -> sprintf "Marshalling.ParseLongArray(table, %s)" field
+  | Option _ -> "Null" (* TODO *)
   | _                   -> assert false
 
 and sanitise_function_name name =
@@ -1444,6 +1447,7 @@ and simple_convert_from_proxy thing ty =
       (exposed_class_name name) thing
   | Set(Int)            ->
     sprintf "Helper.StringArrayToLongArray(%s)" thing
+  | Option n            -> "Null" (* TODO *)
   | _                   -> assert false
 
 
@@ -1464,6 +1468,7 @@ and convert_to_proxy thing ty =
     sprintf "%s(%s)"
       (sanitise_function_name (sprintf "Maps.convert_to_proxy_%s_%s" (exposed_type_as_literal u) (exposed_type_as_literal v))) thing
   | Record name         -> sprintf "%s.ToProxy()" thing
+  | Option n            -> "Null" (* TODO *)
   | _                   -> assert false
 
 
@@ -1589,6 +1594,7 @@ and get_default_value_per_type ty thing =
   | Set _          -> sprintf " = new %s() {%s}" (exposed_type ty) (String.concat ", " thing)
   | Map(u, v)      -> sprintf " = new Dictionary<%s, %s>() {%s}" (exposed_type u) (exposed_type v) (String.concat ", " thing)
   | Record name    -> sprintf " = new %s()" (exposed_type ty)
+  | Option _ -> "Null" (* TODO *)
 
 and gen_i18n_errors () =
   Friendly_error_names.parse_sr_xml sr_xml;

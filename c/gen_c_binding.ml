@@ -578,6 +578,7 @@ and abstract_type record = function
   | Map(l, r) -> sprintf "abstract_type_" ^ (mapname l r)
 
   | Record n -> sprintf "%s_abstract_type_" (record_typename n)
+  | Option n -> (abstract_type record n) ^ "_option"
 
 and get_deprecated_message message =
   let deprecatedMessage = get_deprecated_info_message message in
@@ -1278,43 +1279,43 @@ and add_enum_map_internal needed l r =
   | _ -> needed
 
 
-and c_type_of_ty needed record = function
-  | String              -> "char *"
-  | Int                 -> "int64_t "
-  | Float               -> "double "
-  | Bool                -> "bool "
-  | DateTime            -> "time_t "
-  | Ref "session"       -> "xen_session *"
+and c_type_of_ty_ptr needed record = function
+  | String              -> "char *", true
+  | Int                 -> "int64_t ", false
+  | Float               -> "double ", false
+  | Bool                -> "bool ", false
+  | DateTime            -> "time_t ", false
+  | Ref "session"       -> "xen_session *", true
   | Ref name            ->
     needed := StringSet.add (name ^ "_decl") !needed;
     if record then
-      sprintf "struct %s *" (record_opt_typename name)
+      sprintf "struct %s *" (record_opt_typename name), true
     else
-      sprintf "%s " (typename name)
+      sprintf "%s " (typename name), false
   | Enum(name, cs) as x ->
     needed := StringSet.add name !needed;
     enums := TypeSet.add x !enums;
-    c_type_of_enum name
+    c_type_of_enum name, false
   | Set (Ref name) ->
     needed := StringSet.add (name ^ "_decl") !needed;
-    if record then
+    (if record then
       sprintf "struct %s_set *" (record_opt_typename name)
     else
-      sprintf "struct %s_set *" (typename name)
+      sprintf "struct %s_set *" (typename name)), true
   | Set (Enum (e, _) as x) ->
     let enum_typename = typename e in
     needed := StringSet.add e !needed;
     enums := TypeSet.add x !enums;
-    sprintf "struct %s_set *" enum_typename
+    sprintf "struct %s_set *" enum_typename, true
   | Set(String) ->
     needed := StringSet.add "string_set" !needed;
-    "struct xen_string_set *"
+    "struct xen_string_set *", true
   | Set (Record n) ->
     needed := StringSet.add (n ^ "_decl") !needed;
-    sprintf "struct %s_set *" (record_typename n)
+    sprintf "struct %s_set *" (record_typename n), true
   | Set (Int)            ->
     needed := StringSet.add "int_set" !needed;
-    "struct xen_int_set *"
+    "struct xen_int_set *", true
   | Map(l, r) as x ->
     let n = mapname l r in
     needed := StringSet.add n !needed;
@@ -1325,12 +1326,17 @@ and c_type_of_ty needed record = function
       | (_, Enum(_, _)) -> enum_maps := TypeSet.add x !enum_maps
       | _ -> ()
     end;
-    sprintf "%s *" (typename n)
+    sprintf "%s *" (typename n), true
   | Record n -> if record then
-      sprintf "struct %s *" (record_typename n)
+      sprintf "struct %s *" (record_typename n), true
     else
-      sprintf "%s *" (record_typename n)
+      sprintf "%s *" (record_typename n), true
+  | Option n ->
+    let s, pointer = c_type_of_ty_ptr needed record n in
+    (if pointer then s else s ^ " *"), true
   | _ -> assert false
+
+and c_type_of_ty needed record ty = c_type_of_ty_ptr needed record ty |> fst
 
 
 and c_type_of_enum name =
