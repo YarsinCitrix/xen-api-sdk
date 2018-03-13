@@ -175,7 +175,8 @@ let rec get_java_type ty =
   | Set(t1)       -> sprintf "Set<%s>" (get_java_type t1)
   | Map(t1, t2)   -> sprintf "Map<%s, %s>" (get_java_type t1) (get_java_type t2)
   | Ref(ty)       -> class_case ty (* We want to hide all refs *)
-  | Record(ty)    -> sprintf "%s.Record" (class_case ty);;
+  | Record(ty)    -> sprintf "%s.Record" (class_case ty)
+  | Option(ty)    -> get_java_type ty
 
 
 (*We'd like the list of XenAPI objects to appear as an enumeration so we can*)
@@ -195,6 +196,7 @@ let rec get_marshall_function_rec = function
   | Map(t1, t2)   -> sprintf "MapOf%s%s" (get_marshall_function_rec t1) (get_marshall_function_rec t2)
   | Ref(ty)       -> class_case ty (* We want to hide all refs *)
   | Record(ty)     -> sprintf "%sRecord" (class_case ty)
+  | Option(ty)    -> get_marshall_function_rec ty
 
 
 (*get_marshall_function (Set(Map(Float,Bool)));; -> "toSetOfMapOfDoubleBoolean"*)
@@ -408,6 +410,7 @@ let field_default = function
   | Set(t1)       -> sprintf "new LinkedHashSet<%s>()" (get_java_type t1)
   | Map(t1, t2)   -> sprintf "new HashMap<%s, %s>()" (get_java_type t1) (get_java_type t2)
   | Ref(ty)       -> sprintf "new %s(\"OpaqueRef:NULL\")" (class_case ty)
+  | Option(ty)    -> "null"
   | Record(ty)    -> assert false
 
 
@@ -677,7 +680,17 @@ let gen_marshall_body file = function
     List.iter (gen_marshall_record_contents file []) contents;
     (*Event.Record needs a special case to handle snapshots*)
     if (ty="event") then generate_snapshot_hack file;
-    fprintf file "        return record;\n";;
+    fprintf file "        return record;\n"
+  | Option(ty)    ->
+    let marshall_fn = get_marshall_function ty in
+    fprintf file "        Object[] items = (Object[]) object;\n";
+    fprintf file "        Object[] items = (Object[]) object;\n";
+    fprintf file "        switch (items.getLength() ) {;\n";
+    fprintf file "          case 0: return null;\n";
+    fprintf file "          case 1:\n";
+    fprintf file "            return %s(items[0]);\n" marshall_fn;
+    fprintf file "          default: return null;\n"; (* TODO *)
+    fprintf file "        }\n"
 
 let gen_marshall_func file ty =
   let type_string = get_java_type ty in
