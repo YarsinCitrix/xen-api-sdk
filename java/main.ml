@@ -683,14 +683,7 @@ let gen_marshall_body file = function
     fprintf file "        return record;\n"
   | Option(ty)    ->
     let marshall_fn = get_marshall_function ty in
-    fprintf file "        Object[] items = (Object[]) object;\n";
-    fprintf file "        Object[] items = (Object[]) object;\n";
-    fprintf file "        switch (items.getLength() ) {;\n";
-    fprintf file "          case 0: return null;\n";
-    fprintf file "          case 1:\n";
-    fprintf file "            return %s(items[0]);\n" marshall_fn;
-    fprintf file "          default: return null;\n"; (* TODO *)
-    fprintf file "        }\n"
+    fprintf file "        return null\n;" (* TODO *)
 
 let gen_marshall_func file ty =
   let type_string = get_java_type ty in
